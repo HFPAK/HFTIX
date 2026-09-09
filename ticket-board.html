@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12161d;
+    --panel: #1b212b;
+    --panel-line: #2a313d;
+    --text: #e9edf2;
+    --text-dim: #8a93a3;
+    --checkedout: #7d8fd8;
+    --overdue: #c3564f;
+    --new: #e8a33d;
+    --pending: #5b8dbe;
+    --resolved: #6fa287;
+    --danger: #c3564f;
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+  }
+  .app{
+    display:flex; flex-direction:column;
+    height:100vh; width:100vw;
+    padding: 24px 26px 16px;
+  }
+  header{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom: 18px; flex-shrink:0;
+  }
+  header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600; font-size: 1.4rem; margin:0;
+    letter-spacing: -0.01em;
+  }
+  .meta{ display:flex; align-items:center; gap:14px; }
+  .updated{ color: var(--text-dim); font-size: 0.75rem; }
+  .add-btn{
+    background: var(--panel); border:1px solid var(--panel-line);
+    color: var(--text); font-family:'Inter',sans-serif; font-size:0.82rem; font-weight:600;
+    padding: 8px 14px; border-radius: 8px; cursor:pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .add-btn:hover{ border-color:#3a4352; background:#212836; }
+
+  .board{
+    display:grid; grid-template-columns: repeat(5, 1fr); gap: 14px;
+    flex:1; min-height:0;
+  }
+  .column{
+    background: var(--panel); border:1px solid var(--panel-line);
+    border-radius: 12px; display:flex; flex-direction:column; min-height:0;
+    overflow:hidden;
+  }
+  .col-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 12px 12px 10px; flex-shrink:0;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .col-head .label{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .col-checked_out .dot{ background: var(--checkedout); }
+  .col-overdue .dot{ background: var(--overdue); }
+  .col-new .dot{ background: var(--new); }
+  .col-pending .dot{ background: var(--pending); }
+  .col-resolved .dot{ background: var(--resolved); }
+  .col-head h2{
+    font-family:'Space Grotesk', sans-serif; font-weight:600;
+    font-size: 0.88rem; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .count{
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim); background:#12161d; border:1px solid var(--panel-line);
+    border-radius: 999px; padding: 2px 9px; font-size: 0.75rem; font-weight:600;
+    flex-shrink:0;
+  }
+  .cards{
+    flex:1; overflow-y:auto; padding: 10px 10px 14px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .cards::-webkit-scrollbar{ width:7px; }
+  .cards::-webkit-scrollbar-thumb{ background:#2a313d; border-radius:8px; }
+
+  .card{
+    background:#12161d; border:1px solid var(--panel-line); border-radius:10px;
+    padding: 10px 11px; display:flex; gap:9px; align-items:flex-start;
+    animation: rise .22s ease;
+  }
+  @keyframes rise{ from{ opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+  .bar{ width:4px; align-self:stretch; border-radius:4px; flex-shrink:0; }
+  .col-checked_out .bar{ background: var(--checkedout); }
+  .col-overdue .bar{ background: var(--overdue); }
+  .col-new .bar{ background: var(--new); }
+  .col-pending .bar{ background: var(--pending); }
+  .col-resolved .bar{ background: var(--resolved); }
+  .card-body{ flex:1; min-width:0; }
+  .ticket-num{
+    font-variant-numeric: tabular-nums; font-weight:600;
+    color: var(--text-dim); font-size: 0.74rem; margin-bottom:3px;
+  }
+  .ticket-title{
+    font-size: 0.92rem; line-height:1.32; word-break: break-word; margin-bottom: 7px;
+  }
+  .tag-row{ display:flex; gap:5px; flex-wrap:wrap; }
+  .assignee-select, .grade-select{
+    appearance:none; -webkit-appearance:none;
+    background:#1b212b; border:1px solid var(--panel-line); color: var(--text);
+    font-family:'Inter',sans-serif; font-size: 0.7rem; font-weight:600;
+    padding: 3px 20px 3px 9px; border-radius: 999px; cursor:pointer;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0 L5 6 L10 0' fill='none' stroke='%238a93a3' stroke-width='1.5'/></svg>");
+    background-repeat:no-repeat; background-position: right 7px center;
+  }
+  .grade-select{ color: var(--text-dim); }
+  .assignee-select.unassigned{ color: var(--text-dim); font-weight:500; }
+  .assignee-select:focus, .grade-select:focus{ outline:none; border-color:#5b8dbe; }
+  .device-input{
+    appearance:none; -webkit-appearance:none;
+    background:#1b212b; border:1px solid var(--panel-line); color: var(--text);
+    font-family:'Inter',sans-serif; font-size: 0.7rem; font-weight:600;
+    padding: 3px 9px; border-radius: 999px; width: 110px;
+  }
+  .device-input::placeholder{ color: var(--text-dim); font-weight:500; }
+  .device-input:focus{ outline:none; border-color:#5b8dbe; }
+  .due-input{
+    background:#1b212b; border:1px solid var(--panel-line); color: var(--text-dim);
+    font-family:'Inter',sans-serif; font-size: 0.68rem; font-weight:600;
+    padding: 3px 7px; border-radius: 999px; color-scheme: dark;
+  }
+  .due-input:focus{ outline:none; border-color:#5b8dbe; }
+  .overdue-badge{
+    display:inline-flex; align-items:center; gap:4px;
+    background: rgba(195,86,79,0.15); border:1px solid var(--danger); color: var(--danger);
+    font-size:0.68rem; font-weight:700; letter-spacing:0.02em;
+    padding: 3px 9px; border-radius: 999px;
+  }
+  .turned-in-btn{
+    background:none; border:1px solid var(--panel-line); color: var(--text-dim);
+    font-family:'Inter',sans-serif; font-size:0.68rem; font-weight:600;
+    padding: 3px 9px; border-radius: 999px; cursor:pointer;
+  }
+  .turned-in-btn:hover{ color: var(--resolved); border-color: var(--resolved); }
+  .card-actions{ display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+  .icon-btn{
+    background:none; border:1px solid var(--panel-line); color: var(--text-dim);
+    width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:0.8rem;
+    display:flex; align-items:center; justify-content:center; padding:0;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .icon-btn:hover{ color: var(--text); border-color:#4a5566; }
+  .icon-btn.remove:hover{ color: var(--danger); border-color: var(--danger); }
+  .icon-btn:disabled{ opacity:0.25; cursor:default; }
+  .icon-btn:disabled:hover{ color:var(--text-dim); border-color:var(--panel-line); }
+
+  .empty{
+    color: var(--text-dim); font-size:0.78rem; text-align:center;
+    padding: 24px 8px; border:1px dashed var(--panel-line); border-radius:10px;
+  }
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(10,12,16,0.6);
+    display:none; align-items:center; justify-content:center; z-index:10;
+  }
+  .overlay.open{ display:flex; }
+  .panel{
+    background: var(--panel); border:1px solid var(--panel-line);
+    border-radius:14px; padding: 22px; width: 380px; max-width:90vw;
+    max-height: 85vh; overflow-y:auto;
+  }
+  .panel h3{
+    font-family:'Space Grotesk', sans-serif; margin:0 0 16px; font-size:1.1rem;
+  }
+  .field{ margin-bottom: 14px; }
+  .field label{
+    display:block; font-size:0.78rem; color:var(--text-dim); margin-bottom:6px;
+    font-weight:600;
+  }
+  .field input, .field select{
+    width:100%; background:#12161d; border:1px solid var(--panel-line);
+    color:var(--text); border-radius:8px; padding:9px 11px; font-size:0.95rem;
+    font-family:'Inter',sans-serif;
+  }
+  .field input:focus, .field select:focus{ outline:none; border-color:#5b8dbe; }
+  .panel-actions{ display:flex; gap:10px; margin-top: 18px; }
+  .panel-actions button{
+    flex:1; border-radius:8px; padding:10px; font-weight:600; font-size:0.9rem;
+    cursor:pointer; font-family:'Inter',sans-serif; border:1px solid transparent;
+  }
+  .btn-cancel{ background:none; border-color: var(--panel-line); color:var(--text-dim); }
+  .btn-save{ background: var(--pending); color:#0d1117; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Ticket Board</h1>
+    <div class="meta">
+      <span class="updated" id="updated">—</span>
+      <button class="add-btn" id="openAdd">+ Add</button>
+    </div>
+  </header>
+
+  <div class="board" id="board"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <h3>Add ticket</h3>
+    <div class="field">
+      <label for="titleInput">Title</label>
+      <input id="titleInput" type="text" placeholder="e.g. Printer offline on 3rd floor">
+    </div>
+    <div class="field">
+      <label for="assigneeInput">Assigned to</label>
+      <select id="assigneeInput"></select>
+    </div>
+    <div class="field">
+      <label for="deviceInput">Checked out device (leave blank for a regular ticket)</label>
+      <input id="deviceInput" type="text" placeholder="e.g. Laptop #12">
+    </div>
+    <div class="field">
+      <label for="gradeInput">Grade level (if a device checkout)</label>
+      <select id="gradeInput"></select>
+    </div>
+    <div class="field">
+      <label for="dueDateInput">Return date due (if a device checkout)</label>
+      <input id="dueDateInput" type="date">
+    </div>
+    <div class="panel-actions">
+      <button class="btn-cancel" id="cancelAdd">Cancel</button>
+      <button class="btn-save" id="saveAdd">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Paste the Apps Script Web App URL here after deploying (ends in /exec).
+const API_URL = 'https://script.google.com/a/macros/hfchs.org/s/AKfycbzIR9xlavCvN7bNAtJ2A5KogY29n3XUOg0TvWiNJksRtTVquVxs-UJ5w28c6laGb8p0/exec';
+
+const ASSIGNEES = ['Unassigned','Phil','Carlee','Josh','Student Helper'];
+const GRADES = ['—','Grade 9','Grade 10','Grade 11','Grade 12'];
+const COLUMNS = [
+  {key:'checked_out', label:'Checked Out Devices'},
+  {key:'overdue', label:'Overdue Devices'},
+  {key:'new', label:'New'},
+  {key:'pending', label:'Pending'},
+  {key:'resolved', label:'Resolved'}
+];
+let tickets = [];
+let apiError = false;
+
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function isDeviceTicket(t){ return !!(t.device && t.device.trim()); }
+
+function isOverdue(t){
+  return isDeviceTicket(t) && t.status !== 'resolved' && t.dueDate && t.dueDate < todayISO();
+}
+
+// Which board column a ticket currently belongs in.
+function displayColumn(t){
+  if(isDeviceTicket(t)){
+    if(t.status === 'resolved') return 'resolved';
+    return isOverdue(t) ? 'overdue' : 'checked_out';
+  }
+  return t.status; // 'new' | 'pending' | 'resolved'
+}
+
+async function loadTickets(){
+  return new Promise((resolve) => {
+    const callbackName = 'ticketBoardCb_' + Date.now();
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+    const timeout = setTimeout(() => {
+      if(settled) return;
+      settled = true;
+      apiError = true;
+      cleanup();
+      render();
+      resolve();
+    }, 8000);
+
+    window[callbackName] = (data) => {
+      if(settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      tickets = data.tickets || [];
+      apiError = false;
+      cleanup();
+      render();
+      resolve();
+    };
+
+    script.onerror = () => {
+      if(settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      apiError = true;
+      cleanup();
+      render();
+      resolve();
+    };
+
+    script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + 'callback=' + callbackName;
+    document.body.appendChild(script);
+  });
+}
+
+async function apiPost(payload){
+  return new Promise((resolve) => {
+    const frameName = 'ticketBoardFrame_' + Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.name = frameName;
+    iframe.style.display = 'none';
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = API_URL;
+    form.target = frameName;
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
+
+    // We can't read the cross-origin iframe's response, so just give Apps
+    // Script a moment to finish writing, then re-sync from the Sheet.
+    setTimeout(async () => {
+      iframe.remove();
+      form.remove();
+      await loadTickets();
+      resolve();
+    }, 1500);
+  });
+}
+
+function render(){
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  COLUMNS.forEach(col => {
+    const list = tickets.filter(t => displayColumn(t) === col.key).sort((a,b) => b.createdAt - a.createdAt);
+
+    const colEl = document.createElement('div');
+    colEl.className = 'column col-' + col.key;
+
+    const head = document.createElement('div');
+    head.className = 'col-head';
+    head.innerHTML = `<div class="label"><span class="dot"></span><h2>${col.label}</h2></div><span class="count">${list.length}</span>`;
+    colEl.appendChild(head);
+
+    const cardsEl = document.createElement('div');
+    cardsEl.className = 'cards';
+    if(list.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Nothing here';
+      cardsEl.appendChild(empty);
+    } else {
+      list.forEach(t => cardsEl.appendChild(renderCard(t, col.key)));
+    }
+    colEl.appendChild(cardsEl);
+    board.appendChild(colEl);
+  });
+  document.getElementById('updated').textContent = apiError
+    ? '⚠ Connection lost — showing last known data'
+    : 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function renderCard(t, colKey){
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  card.appendChild(bar);
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+
+  const num = document.createElement('div');
+  num.className = 'ticket-num';
+  const createdLabel = t.createdAt ? new Date(t.createdAt).toLocaleDateString([], {month:'short', day:'numeric'}) : '';
+  num.textContent = '#' + t.number + (createdLabel ? '  ·  ' + createdLabel : '');
+  body.appendChild(num);
+
+  const title = document.createElement('div');
+  title.className = 'ticket-title';
+  title.textContent = t.title;
+  body.appendChild(title);
+
+  const tagRow = document.createElement('div');
+  tagRow.className = 'tag-row';
+
+  const assigneeSelect = document.createElement('select');
+  assigneeSelect.className = 'assignee-select' + ((t.assignee || 'Unassigned') === 'Unassigned' ? ' unassigned' : '');
+  ASSIGNEES.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    if((t.assignee || 'Unassigned') === name) opt.selected = true;
+    assigneeSelect.appendChild(opt);
+  });
+  assigneeSelect.onchange = () => setField(t.id, 'assignee', assigneeSelect.value);
+  tagRow.appendChild(assigneeSelect);
+
+  const deviceInput = document.createElement('input');
+  deviceInput.className = 'device-input';
+  deviceInput.type = 'text';
+  deviceInput.placeholder = 'Checked out device';
+  deviceInput.value = t.device || '';
+  deviceInput.addEventListener('change', () => setField(t.id, 'device', deviceInput.value.trim()));
+  deviceInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') deviceInput.blur(); });
+  tagRow.appendChild(deviceInput);
+
+  if(isDeviceTicket(t)){
+    const gradeSelect = document.createElement('select');
+    gradeSelect.className = 'grade-select';
+    GRADES.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g === '—' ? '' : g;
+      opt.textContent = g;
+      if((t.grade || '') === opt.value) opt.selected = true;
+      gradeSelect.appendChild(opt);
+    });
+    gradeSelect.onchange = () => setField(t.id, 'grade', gradeSelect.value);
+    tagRow.appendChild(gradeSelect);
+
+    const dueInput = document.createElement('input');
+    dueInput.className = 'due-input';
+    dueInput.type = 'date';
+    dueInput.value = t.dueDate || '';
+    dueInput.title = 'Return date due';
+    dueInput.addEventListener('change', () => setField(t.id, 'dueDate', dueInput.value));
+    tagRow.appendChild(dueInput);
+
+    if(colKey === 'overdue'){
+      const badge = document.createElement('span');
+      badge.className = 'overdue-badge';
+      badge.textContent = 'OVERDUE';
+      tagRow.appendChild(badge);
+    }
+
+    if(t.status !== 'resolved'){
+      const turnedInBtn = document.createElement('button');
+      turnedInBtn.className = 'turned-in-btn';
+      turnedInBtn.textContent = 'Mark turned in';
+      turnedInBtn.onclick = () => markTurnedIn(t.id);
+      tagRow.appendChild(turnedInBtn);
+    }
+  }
+
+  body.appendChild(tagRow);
+  card.appendChild(body);
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  if(!isDeviceTicket(t)){
+    // Regular ticket: manual New -> Pending -> Resolved movement.
+    const order = ['new','pending','resolved'];
+    const idx = order.indexOf(t.status);
+
+    const back = document.createElement('button');
+    back.className = 'icon-btn';
+    back.textContent = '‹';
+    back.title = 'Move back';
+    back.disabled = idx <= 0;
+    back.onclick = () => moveTicket(t.id, -1);
+
+    const fwd = document.createElement('button');
+    fwd.className = 'icon-btn';
+    fwd.textContent = '›';
+    fwd.title = 'Move forward';
+    fwd.disabled = idx >= order.length - 1;
+    fwd.onclick = () => moveTicket(t.id, 1);
+
+    actions.appendChild(back);
+    actions.appendChild(fwd);
+  }
+
+  const remove = document.createElement('button');
+  remove.className = 'icon-btn remove';
+  remove.textContent = '×';
+  remove.title = 'Remove';
+  remove.onclick = () => removeTicket(t.id);
+  actions.appendChild(remove);
+
+  card.appendChild(actions);
+  return card;
+}
+
+async function moveTicket(id, dir){
+  const order = ['new','pending','resolved'];
+  const t = tickets.find(x => x.id === id);
+  if(!t) return;
+  const idx = order.indexOf(t.status) + dir;
+  if(idx < 0 || idx >= order.length) return;
+  await apiPost({ action:'update', id, field:'status', value: order[idx] });
+}
+
+async function markTurnedIn(id){
+  await apiPost({ action:'update', id, field:'status', value:'resolved' });
+}
+
+async function setField(id, field, value){
+  await apiPost({ action:'update', id, field, value });
+}
+
+async function removeTicket(id){
+  await apiPost({ action:'delete', id });
+}
+
+const overlay = document.getElementById('overlay');
+const titleInput = document.getElementById('titleInput');
+const assigneeInput = document.getElementById('assigneeInput');
+const deviceFieldInput = document.getElementById('deviceInput');
+const gradeInput = document.getElementById('gradeInput');
+const dueDateInput = document.getElementById('dueDateInput');
+
+ASSIGNEES.forEach(name => {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  assigneeInput.appendChild(opt);
+});
+GRADES.forEach(g => {
+  const opt = document.createElement('option');
+  opt.value = g === '—' ? '' : g;
+  opt.textContent = g;
+  gradeInput.appendChild(opt);
+});
+
+document.getElementById('openAdd').onclick = () => {
+  titleInput.value = '';
+  assigneeInput.value = 'Unassigned';
+  deviceFieldInput.value = '';
+  gradeInput.value = '';
+  dueDateInput.value = '';
+  overlay.classList.add('open');
+  setTimeout(() => titleInput.focus(), 50);
+};
+document.getElementById('cancelAdd').onclick = () => overlay.classList.remove('open');
+overlay.onclick = (e) => { if(e.target === overlay) overlay.classList.remove('open'); };
+
+document.getElementById('saveAdd').onclick = async () => {
+  const title = titleInput.value.trim();
+  if(!title) return;
+  overlay.classList.remove('open');
+  await apiPost({
+    action: 'create', title,
+    assignee: assigneeInput.value,
+    device: deviceFieldInput.value.trim(),
+    grade: gradeInput.value,
+    dueDate: dueDateInput.value
+  });
+};
+titleInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') document.getElementById('saveAdd').click(); });
+
+(async function init(){
+  if(API_URL === 'PASTE_YOUR_WEB_APP_URL_HERE'){
+    document.getElementById('board').innerHTML =
+      '<div class="empty" style="grid-column:1/-1;padding:60px;">Set API_URL in the code to your deployed Apps Script Web App URL, then reload.</div>';
+    return;
+  }
+  await loadTickets();
+  setInterval(loadTickets, 4000);
+})();
+</script>
+</body>
+</html>
