@@ -196,6 +196,15 @@
   }
   .btn-cancel{ background:none; border-color: var(--panel-line); color:var(--text-dim); }
   .btn-save{ background: var(--pending); color:#0d1117; }
+  .card{ cursor: pointer; }
+  .detail-row{ display:flex; justify-content:space-between; gap:12px; font-size:0.85rem; padding:6px 0; border-bottom:1px solid var(--panel-line); }
+  .detail-row span:first-child{ color:var(--text-dim); }
+  .field textarea{
+    width:100%; background:#12161d; border:1px solid var(--panel-line);
+    color:var(--text); border-radius:8px; padding:9px 11px; font-size:0.9rem;
+    font-family:'Inter',sans-serif; resize:vertical; min-height:90px;
+  }
+  .field textarea:focus{ outline:none; border-color:#5b8dbe; }
 </style>
 </head>
 <body>
@@ -237,6 +246,21 @@
     <div class="panel-actions">
       <button class="btn-cancel" id="cancelAdd">Cancel</button>
       <button class="btn-save" id="saveAdd">Add</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="detailOverlay">
+  <div class="panel">
+    <h3 id="detailTitle">Ticket</h3>
+    <div id="detailSummary" style="margin-bottom:14px;"></div>
+    <div class="field">
+      <label for="detailsInput">Details (not shown on the board)</label>
+      <textarea id="detailsInput" placeholder="Internal notes, extra context, etc."></textarea>
+    </div>
+    <div class="panel-actions">
+      <button class="btn-cancel" id="cancelDetail">Close</button>
+      <button class="btn-save" id="saveDetail">Save</button>
     </div>
   </div>
 </div>
@@ -507,6 +531,12 @@ function renderCard(t, colKey){
   actions.appendChild(remove);
 
   card.appendChild(actions);
+
+  card.addEventListener('click', (e) => {
+    if(e.target.closest('select, input, button')) return; // let inner controls work normally
+    openDetailModal(t);
+  });
+
   return card;
 }
 
@@ -530,6 +560,40 @@ async function setField(id, field, value){
 async function removeTicket(id){
   await apiPost({ action:'delete', id });
 }
+
+const detailOverlay = document.getElementById('detailOverlay');
+const detailTitle = document.getElementById('detailTitle');
+const detailSummary = document.getElementById('detailSummary');
+const detailsInput = document.getElementById('detailsInput');
+let currentDetailId = null;
+
+function openDetailModal(t){
+  currentDetailId = t.id;
+  detailTitle.textContent = '#' + t.number + ' — ' + t.title;
+  const rows = [
+    ['Status', t.status.charAt(0).toUpperCase() + t.status.slice(1)],
+    ['Assigned to', t.assignee || 'Unassigned']
+  ];
+  if(isDeviceTicket(t)){
+    rows.push(['Device', t.device]);
+    if(t.grade) rows.push(['Grade level', t.grade]);
+    if(t.dueDate) rows.push(['Return due', t.dueDate]);
+  }
+  detailSummary.innerHTML = rows.map(r =>
+    `<div class="detail-row"><span>${r[0]}</span><span>${r[1]}</span></div>`
+  ).join('');
+  detailsInput.value = t.details || '';
+  detailOverlay.classList.add('open');
+}
+
+document.getElementById('cancelDetail').onclick = () => detailOverlay.classList.remove('open');
+detailOverlay.onclick = (e) => { if(e.target === detailOverlay) detailOverlay.classList.remove('open'); };
+
+document.getElementById('saveDetail').onclick = async () => {
+  const id = currentDetailId;
+  detailOverlay.classList.remove('open');
+  await setField(id, 'details', detailsInput.value.trim());
+};
 
 const overlay = document.getElementById('overlay');
 const titleInput = document.getElementById('titleInput');
